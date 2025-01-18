@@ -53,6 +53,7 @@ import { AssistantMessageContent, parseAssistantMessage, ToolParamName, ToolUseN
 import { formatResponse } from "./prompts/responses"
 import { addCustomInstructions, SYSTEM_PROMPT } from "./prompts/system"
 import { modes, defaultModeSlug } from "../shared/modes"
+import { ContextManager } from "./context/ContextManager"
 import { truncateHalfConversation } from "./sliding-window"
 import { ClineProvider, GlobalFileNames } from "./webview/ClineProvider"
 import { detectCodeOmission } from "../integrations/editor/detect-omission"
@@ -80,6 +81,7 @@ export class Cline {
 	diffStrategy?: DiffStrategy
 	diffEnabled: boolean = false
 	fuzzyMatchThreshold: number = 1.0
+	private contextManager: ContextManager
 
 	apiConversationHistory: (Anthropic.MessageParam & { ts?: number })[] = []
 	clineMessages: ClineMessage[] = []
@@ -131,6 +133,7 @@ export class Cline {
 		this.fuzzyMatchThreshold = fuzzyMatchThreshold ?? 1.0
 		this.providerRef = new WeakRef(provider)
 		this.diffViewProvider = new DiffViewProvider(cwd)
+		this.contextManager = new ContextManager({ context: provider.context })
 
 		if (historyItem) {
 			this.taskId = historyItem.id
@@ -434,6 +437,9 @@ export class Cline {
 		this.clineMessages = []
 		this.apiConversationHistory = []
 		await this.providerRef.deref()?.postStateToWebview()
+
+		// Initialize task context
+		await this.contextManager.initializeTaskContext(this.taskId, task || "")
 
 		await this.say("text", task, images)
 
@@ -779,6 +785,14 @@ export class Cline {
 				),
 			]
 		}
+
+		// Record command in history and update task progress
+		await this.contextManager.addCommandToHistory(command)
+		await this.contextManager.updateTaskProgress(
+			completed ? "command_completed" : "command_running",
+			completed ? [command] : [],
+			completed ? [] : [command],
+		)
 
 		if (completed) {
 			return [false, `Command executed.${result.length > 0 ? `\nOutput:\n${result}` : ""}`]
@@ -1328,7 +1342,20 @@ export class Cline {
 									pushToolResult(
 										`The content was successfully saved to ${relPath.toPosix()}.${newProblemsMessage}`,
 									)
+									// Record successful file write pattern
+									await this.contextManager.recordPattern("write_to_file:success")
 								}
+
+								// Update technical context with the modified file
+								await this.contextManager.updateTechnicalContext({
+									lastAnalyzedFiles: [relPath],
+									projectStructure: {
+										root: cwd,
+										mainFiles: [relPath],
+										dependencies: [],
+									},
+								})
+
 								await this.diffViewProvider.reset()
 								break
 							}
@@ -1450,6 +1477,17 @@ export class Cline {
 										`Changes successfully applied to ${relPath.toPosix()}:\n\n${newProblemsMessage}`,
 									)
 								}
+
+								// Update technical context with the modified file
+								await this.contextManager.updateTechnicalContext({
+									lastAnalyzedFiles: [relPath],
+									projectStructure: {
+										root: cwd,
+										mainFiles: [relPath],
+										dependencies: [],
+									},
+								})
+
 								await this.diffViewProvider.reset()
 								break
 							}
@@ -1491,6 +1529,25 @@ export class Cline {
 								}
 								// now execute the tool like normal
 								const content = await extractTextFromFile(absolutePath)
+
+								// Update technical context with analyzed file
+								await this.contextManager.updateTechnicalContext({
+									lastAnalyzedFiles: [relPath],
+									projectStructure: {
+										root: cwd,
+										mainFiles: this.contextManager
+											.getContext()
+											.technical.projectStructure.mainFiles.includes(relPath)
+											? this.contextManager.getContext().technical.projectStructure.mainFiles
+											: [
+													...this.contextManager.getContext().technical.projectStructure
+														.mainFiles,
+													relPath,
+												],
+										dependencies: [],
+									},
+								})
+
 								pushToolResult(content)
 								break
 							}
@@ -1751,6 +1808,12 @@ export class Cline {
 									case "scroll_down":
 									case "scroll_up":
 										await this.say("browser_action_result", JSON.stringify(browserActionResult))
+
+										// Record successful browser action pattern
+										await this.contextManager.recordPattern(
+											`browser_action_result:${action}:executed`,
+										)
+
 										pushToolResult(
 											formatResponse.toolResult(
 												`The browser action has been executed. The console logs and screenshot have been captured for your analysis.\n\nConsole logs:\n${
@@ -1897,6 +1960,10 @@ export class Cline {
 											.filter(Boolean)
 											.join("\n\n") || "(No response)"
 								await this.say("mcp_server_response", toolResultPretty)
+
+								// Record successful MCP tool execution pattern
+								await this.contextManager.recordPattern(`mcp_tool:${server_name}:${tool_name}:executed`)
+
 								pushToolResult(formatResponse.toolResult(toolResultPretty))
 								break
 							}
@@ -1958,6 +2025,10 @@ export class Cline {
 										.filter(Boolean)
 										.join("\n\n") || "(Empty response)"
 								await this.say("mcp_server_response", resourceResultPretty)
+
+								// Record successful MCP resource access pattern
+								await this.contextManager.recordPattern(`mcp_resource:${server_name}:used`)
+
 								pushToolResult(formatResponse.toolResult(resourceResultPretty))
 								break
 							}

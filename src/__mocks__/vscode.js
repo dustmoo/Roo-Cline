@@ -1,4 +1,9 @@
 const vscode = {
+	ExtensionMode: {
+		Production: 1,
+		Development: 2,
+		Test: 3,
+	},
 	window: {
 		showInformationMessage: jest.fn(),
 		showErrorMessage: jest.fn(),

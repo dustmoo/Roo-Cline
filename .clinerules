@@ -1,6 +1,7 @@
 # Code Quality Rules
 
 1. Test Coverage:
+   - Your Dev prefers that functionality be user-test
    - Before attempting completion, always make sure that any code changes have test coverage
    - Ensure all tests pass before submitting changes
 
@@ -13,3 +14,85 @@
 # Adding a New Setting
 
 To add a new setting that persists its state, follow the steps in cline_docs/settings.md
+
+# Current Project
+
+# AI Code Collaboration Framework Requirements
+
+## Purpose
+We are supporting Roo-Cline open source. As a supporting DEV I want to create a structured approach for human-AI pair programming that optimizes AI language model interactions by understanding and working with their fundamental characteristics:
+- Pattern-based responses
+- Stateless nature
+- Probability-driven outputs
+- Context window limitations
+
+## Core Problem Statement
+AI code assistants operate on pattern recognition and probability distributions but currently lack:
+1. Persistent memory between interactions
+2. True causal understanding
+3. Ability to maintain context over long sessions
+4. Consistent constraint adherence without reminders
+
+## Solution Requirements
+
+### 1. Context Management
+```typescript
+// Each interaction needs to be self-contained and explicit
+interface DevelopmentContext {
+    // What are we working on right now?
+    currentTask: {
+        scope: string;     // Single, focused objective
+        stage: string;     // Where we are in implementation
+    };
+
+    // What patterns should the AI follow?
+    technicalContext: {
+        framework: string;    // e.g., "Vitest", "Jest"
+        language: string;     // e.g., "TypeScript"
+        patterns: string[];   // Expected code patterns
+    };
+
+    // What are the boundaries?
+    constraints: {
+        size: string;        // e.g., "Single test case"
+        style: string[];     // e.g., ["Functional", "Immutable"]
+        dependencies: string[] // Required imports/tools
+    };
+}
+```
+
+### 2. Interaction Protocol
+Must support:
+- One task at a time
+- Explicit context setting
+- Clear constraints
+- Pattern reinforcement
+- Regular verification points
+
+### 3. Development Flow
+Each feature development should:
+1. Start with smallest testable unit
+2. Provide minimal but sufficient context
+3. Verify output matches expected patterns
+4. Explicitly progress to next step
+
+## Success Criteria
+1. Reduced pattern mixing (e.g., Jest patterns in Vitest code)
+2. Consistent adherence to specified constraints
+3. Manageable, focused outputs
+4. Clear progression through development tasks
+
+## Implementation Priorities
+1. Context Template Structure
+2. Interaction Protocol Definition
+3. Pattern Library
+4. Development Flow Management
+
+## First Development Task
+Create the base context template structure that will:
+- Define minimal required context for AI interaction
+- Validate context completeness
+- Support single-task focus
+- Enable pattern enforcement
+
+## Contributions, we are contributing to a larger project, please match current design patterns and ask the user to provide more information when encountering a broader distribution
