@@ -725,43 +725,8 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 						const newMode = message.text as Mode
 						await this.updateGlobalState("mode", newMode)
 
-						// Add transition messages if needed to ensure proper conversation alternation
-						if (this.cline) {
-							const history = this.cline.apiConversationHistory
-							const lastMessage = history[history.length - 1]
-							const secondLastMessage = history[history.length - 2]
-							let newHistory = [...history]
-
-							// If no messages exist, add a user message to start the conversation
-							if (!lastMessage) {
-								newHistory = [
-									{
-										role: "user",
-										content: "Starting " + newMode + " mode",
-									},
-								]
-							}
-							// If last message was from assistant, add a user message
-							else if (lastMessage?.role === "assistant") {
-								newHistory.push({
-									role: "user",
-									content: "Switching to " + newMode + " mode",
-								})
-							}
-							// If last two messages were from user, add an assistant message followed by a user message
-							else if (lastMessage?.role === "user" && secondLastMessage?.role === "user") {
-								newHistory.push({
-									role: "assistant",
-									content: "Understood. I'll help you with that.",
-								})
-								newHistory.push({
-									role: "user",
-									content: "Switching to " + newMode + " mode",
-								})
-							}
-
-							await this.cline.overwriteApiConversationHistory(newHistory)
-						}
+						// Mode changes don't need to be part of the conversation history
+						// Just update the mode and continue with the existing conversation
 
 						// Load the saved API config for the new mode if it exists
 						const savedConfigId = await this.configManager.GetModeConfigId(newMode)

@@ -437,53 +437,84 @@ describe("ClineProvider", () => {
 		expect(state.alwaysApproveResubmit).toBe(false)
 	})
 
-	test("loads saved API config when switching modes", async () => {
-		provider.resolveWebviewView(mockWebviewView)
-		const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0]
+	describe("mode switching", () => {
+		test("updates mode without modifying conversation history", async () => {
+			provider.resolveWebviewView(mockWebviewView)
+			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0]
 
-		// Mock ConfigManager methods
-		provider.configManager = {
-			GetModeConfigId: jest.fn().mockResolvedValue("test-id"),
-			ListConfig: jest.fn().mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
-			LoadConfig: jest.fn().mockResolvedValue({ apiProvider: "anthropic" }),
-			SetModeConfig: jest.fn(),
-		} as any
-
-		// Switch to architect mode
-		await messageHandler({ type: "mode", text: "architect" })
-
-		// Should load the saved config for architect mode
-		expect(provider.configManager.GetModeConfigId).toHaveBeenCalledWith("architect")
-		expect(provider.configManager.LoadConfig).toHaveBeenCalledWith("test-config")
-		expect(mockContext.globalState.update).toHaveBeenCalledWith("currentApiConfigName", "test-config")
-	})
-
-	test("saves current config when switching to mode without config", async () => {
-		provider.resolveWebviewView(mockWebviewView)
-		const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0]
-
-		// Mock ConfigManager methods
-		provider.configManager = {
-			GetModeConfigId: jest.fn().mockResolvedValue(undefined),
-			ListConfig: jest
-				.fn()
-				.mockResolvedValue([{ name: "current-config", id: "current-id", apiProvider: "anthropic" }]),
-			SetModeConfig: jest.fn(),
-		} as any
-
-		// Mock current config name
-		;(mockContext.globalState.get as jest.Mock).mockImplementation((key: string) => {
-			if (key === "currentApiConfigName") {
-				return "current-config"
+			// Setup mock Cline instance with conversation history
+			const mockHistory = [
+				{ role: "user", content: "Hello" },
+				{ role: "assistant", content: "Hi" },
+			]
+			const mockCline = {
+				apiConversationHistory: mockHistory,
+				overwriteApiConversationHistory: jest.fn(),
 			}
-			return undefined
+			// @ts-ignore - accessing private property for testing
+			provider.cline = mockCline
+
+			// Switch to architect mode
+			await messageHandler({ type: "mode", text: "architect" })
+
+			// Verify mode was updated
+			expect(mockContext.globalState.update).toHaveBeenCalledWith("mode", "architect")
+
+			// Verify conversation history was not modified
+			expect(mockCline.overwriteApiConversationHistory).not.toHaveBeenCalled()
+			expect(mockCline.apiConversationHistory).toEqual(mockHistory)
 		})
 
-		// Switch to architect mode
-		await messageHandler({ type: "mode", text: "architect" })
+		test("loads saved API config when switching modes", async () => {
+			provider.resolveWebviewView(mockWebviewView)
+			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0]
 
-		// Should save current config as default for architect mode
-		expect(provider.configManager.SetModeConfig).toHaveBeenCalledWith("architect", "current-id")
+			// Mock ConfigManager methods
+			provider.configManager = {
+				GetModeConfigId: jest.fn().mockResolvedValue("test-id"),
+				ListConfig: jest
+					.fn()
+					.mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
+				LoadConfig: jest.fn().mockResolvedValue({ apiProvider: "anthropic" }),
+				SetModeConfig: jest.fn(),
+			} as any
+
+			// Switch to architect mode
+			await messageHandler({ type: "mode", text: "architect" })
+
+			// Should load the saved config for architect mode
+			expect(provider.configManager.GetModeConfigId).toHaveBeenCalledWith("architect")
+			expect(provider.configManager.LoadConfig).toHaveBeenCalledWith("test-config")
+			expect(mockContext.globalState.update).toHaveBeenCalledWith("currentApiConfigName", "test-config")
+		})
+
+		test("saves current config when switching to mode without config", async () => {
+			provider.resolveWebviewView(mockWebviewView)
+			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0]
+
+			// Mock ConfigManager methods
+			provider.configManager = {
+				GetModeConfigId: jest.fn().mockResolvedValue(undefined),
+				ListConfig: jest
+					.fn()
+					.mockResolvedValue([{ name: "current-config", id: "current-id", apiProvider: "anthropic" }]),
+				SetModeConfig: jest.fn(),
+			} as any
+
+			// Mock current config name
+			;(mockContext.globalState.get as jest.Mock).mockImplementation((key: string) => {
+				if (key === "currentApiConfigName") {
+					return "current-config"
+				}
+				return undefined
+			})
+
+			// Switch to architect mode
+			await messageHandler({ type: "mode", text: "architect" })
+
+			// Should save current config as default for architect mode
+			expect(provider.configManager.SetModeConfig).toHaveBeenCalledWith("architect", "current-id")
+		})
 	})
 
 	test("saves config as default for current mode when loading config", async () => {
