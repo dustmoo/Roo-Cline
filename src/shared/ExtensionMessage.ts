@@ -108,6 +108,15 @@ export interface ExtensionState {
 	experimentalDiffStrategy?: boolean
 	autoApprovalEnabled?: boolean
 	customModes: ModeConfig[]
+	contextMemoryEnabled: boolean
+	contextMemoryModeSettings: Record<
+		Mode,
+		{
+			maxHistoryItems: number
+			maxPatterns: number
+			maxMistakes: number
+		}
+	>
 }
 
 export interface ClineMessage {

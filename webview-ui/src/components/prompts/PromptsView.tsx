@@ -16,6 +16,7 @@ import {
 	ModeConfig,
 	enhancePrompt,
 } from "../../../../src/shared/modes"
+import { DEFAULT_CONTEXT_SETTINGS } from "../../../../src/shared/context-defaults"
 import { TOOL_GROUPS, GROUP_DISPLAY_NAMES, ToolGroup } from "../../../../src/shared/tool-groups"
 import { vscode } from "../../utils/vscode"
 
@@ -38,6 +39,10 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 		preferredLanguage,
 		setPreferredLanguage,
 		customModes,
+		contextMemoryEnabled,
+		setContextMemoryEnabled,
+		contextMemoryModeSettings,
+		setContextMemoryModeSettings,
 	} = useExtensionState()
 
 	// Memoize modes to preserve array order
@@ -666,6 +671,139 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 							)}
 						</div>
 					</>
+
+					{/* Context Memory Settings */}
+					<div style={{ marginBottom: "16px" }}>
+						<div
+							style={{
+								display: "flex",
+								justifyContent: "space-between",
+								alignItems: "center",
+								marginBottom: "4px",
+							}}>
+							<div style={{ fontWeight: "bold" }}>Context Memory Settings</div>
+							<VSCodeCheckbox
+								checked={contextMemoryEnabled}
+								onChange={(e) => {
+									const target = (e as CustomEvent)?.detail?.target || (e.target as HTMLInputElement)
+									setContextMemoryEnabled(target.checked)
+								}}>
+								Enabled
+							</VSCodeCheckbox>
+						</div>
+						<div
+							style={{
+								fontSize: "13px",
+								color: "var(--vscode-descriptionForeground)",
+								marginBottom: "8px",
+							}}>
+							Configure how much context to maintain for {getCurrentMode()?.name || "Code"} mode.
+						</div>
+						<div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+							<div>
+								<div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+									<span style={{ minWidth: "120px" }}>History items</span>
+									<input
+										type="range"
+										min="1"
+										max="100"
+										disabled={!contextMemoryEnabled}
+										value={
+											contextMemoryModeSettings[mode]?.maxHistoryItems ??
+											DEFAULT_CONTEXT_SETTINGS[mode]?.maxHistoryItems
+										}
+										onChange={(e) => {
+											const newSettings = {
+												...contextMemoryModeSettings,
+												[mode]: {
+													...contextMemoryModeSettings[mode],
+													maxHistoryItems: parseInt(e.target.value),
+												},
+											}
+											setContextMemoryModeSettings(newSettings)
+										}}
+										style={{
+											flexGrow: 1,
+											accentColor: "var(--vscode-button-background)",
+											height: "2px",
+										}}
+									/>
+									<span style={{ minWidth: "35px", textAlign: "left" }}>
+										{contextMemoryModeSettings[mode]?.maxHistoryItems ??
+											DEFAULT_CONTEXT_SETTINGS[mode]?.maxHistoryItems}
+									</span>
+								</div>
+							</div>
+							<div>
+								<div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+									<span style={{ minWidth: "120px" }}>Patterns</span>
+									<input
+										type="range"
+										min="1"
+										max="50"
+										disabled={!contextMemoryEnabled}
+										value={
+											contextMemoryModeSettings[mode]?.maxPatterns ??
+											DEFAULT_CONTEXT_SETTINGS[mode]?.maxPatterns
+										}
+										onChange={(e) => {
+											const newSettings = {
+												...contextMemoryModeSettings,
+												[mode]: {
+													...contextMemoryModeSettings[mode],
+													maxPatterns: parseInt(e.target.value),
+												},
+											}
+											setContextMemoryModeSettings(newSettings)
+										}}
+										style={{
+											flexGrow: 1,
+											accentColor: "var(--vscode-button-background)",
+											height: "2px",
+										}}
+									/>
+									<span style={{ minWidth: "35px", textAlign: "left" }}>
+										{contextMemoryModeSettings[mode]?.maxPatterns ??
+											DEFAULT_CONTEXT_SETTINGS[mode]?.maxPatterns}
+									</span>
+								</div>
+							</div>
+							<div>
+								<div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+									<span style={{ minWidth: "120px" }}>Mistakes</span>
+									<input
+										type="range"
+										min="1"
+										max="20"
+										disabled={!contextMemoryEnabled}
+										value={
+											contextMemoryModeSettings[mode]?.maxMistakes ??
+											DEFAULT_CONTEXT_SETTINGS[mode]?.maxMistakes
+										}
+										onChange={(e) => {
+											const newSettings = {
+												...contextMemoryModeSettings,
+												[mode]: {
+													...contextMemoryModeSettings[mode],
+													maxMistakes: parseInt(e.target.value),
+												},
+											}
+											setContextMemoryModeSettings(newSettings)
+										}}
+										style={{
+											flexGrow: 1,
+											accentColor: "var(--vscode-button-background)",
+											height: "2px",
+										}}
+									/>
+									<span style={{ minWidth: "35px", textAlign: "left" }}>
+										{contextMemoryModeSettings[mode]?.maxMistakes ??
+											DEFAULT_CONTEXT_SETTINGS[mode]?.maxMistakes}
+									</span>
+								</div>
+							</div>
+						</div>
+					</div>
 
 					{/* Role definition for both built-in and custom modes */}
 					<div style={{ marginBottom: "8px" }}>

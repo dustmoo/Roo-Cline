@@ -71,17 +71,30 @@ export interface UserContext {
 }
 
 /**
+ * Mode-specific context settings
+ */
+export interface ModeContextSettings {
+	maxHistoryItems: number
+	maxPatterns: number
+	maxMistakes: number
+}
+
+/**
  * Configuration options for context management
  * Following VSCode extension patterns for state management
  */
 export interface ContextConfig {
 	// VSCode extension context for state management
 	context: vscode.ExtensionContext
-	// Maximum items to keep in history lists
+	// Whether context memory is enabled
+	enabled?: boolean
+	// Current active mode
+	currentMode?: string
+	// Mode-specific settings
+	modeSettings?: Record<string, ModeContextSettings>
+	// Fallback settings when mode-specific not available
 	maxHistoryItems?: number
-	// Maximum patterns to track
 	maxPatterns?: number
-	// Maximum mistakes to remember
 	maxMistakes?: number
 }
 
@@ -89,6 +102,25 @@ export interface ContextConfig {
  * Default configuration values
  */
 export const DEFAULT_CONFIG: Omit<Required<ContextConfig>, "context"> = {
+	enabled: true,
+	currentMode: "code",
+	modeSettings: {
+		code: {
+			maxHistoryItems: 50,
+			maxPatterns: 20,
+			maxMistakes: 10,
+		},
+		architect: {
+			maxHistoryItems: 30,
+			maxPatterns: 15,
+			maxMistakes: 5,
+		},
+		ask: {
+			maxHistoryItems: 20,
+			maxPatterns: 10,
+			maxMistakes: 3,
+		},
+	},
 	maxHistoryItems: 50,
 	maxPatterns: 20,
 	maxMistakes: 10,
@@ -105,6 +137,7 @@ export type ContextStateKey =
 	| "commandHistory"
 	| "patternHistory"
 	| "mistakeHistory"
+	| "contextSettings"
 
 /**
  * Result of a context validation operation

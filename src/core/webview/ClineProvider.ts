@@ -32,6 +32,7 @@ import { getCommitInfo, searchCommits, getWorkingState } from "../../utils/git"
 import { ConfigManager } from "../config/ConfigManager"
 import { CustomModesManager } from "../config/CustomModesManager"
 import { Mode, modes, CustomPrompts, PromptComponent, enhance, ModeConfig } from "../../shared/modes"
+import { ModeContextSettings, DEFAULT_CONFIG } from "../context/types"
 
 /*
 https://github.com/microsoft/vscode-webview-ui-toolkit-samples/blob/main/default/weather-webview/src/providers/WeatherViewProvider.ts
@@ -104,6 +105,8 @@ type GlobalStateKey =
 	| "experimentalDiffStrategy"
 	| "autoApprovalEnabled"
 	| "customModes" // Array of custom modes
+	| "contextMemoryEnabled"
+	| "contextMemoryModeSettings"
 
 export const GlobalFileNames = {
 	apiConversationHistory: "api_conversation_history.json",
@@ -1175,6 +1178,41 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 							await this.updateGlobalState("mode", defaultModeSlug)
 							await this.postStateToWebview()
 						}
+						break
+					case "contextMemoryEnabled":
+						await this.updateGlobalState("contextMemoryEnabled", message.bool ?? DEFAULT_CONFIG.enabled)
+						await this.postStateToWebview()
+						break
+					case "contextMemorySettings":
+						if (message.values && typeof message.values === "object") {
+							const newSettings = message.values as Record<Mode, ModeContextSettings>
+							const existingSettings = (await this.getGlobalState("contextMemoryModeSettings")) ?? {}
+
+							// Validate settings and use defaults only for invalid values
+							const validatedSettings: Record<Mode, ModeContextSettings> = {}
+							for (const [mode, settings] of Object.entries(newSettings)) {
+								if (mode in DEFAULT_CONFIG.modeSettings) {
+									const modeKey = mode as Mode
+									if (
+										!settings.maxHistoryItems ||
+										settings.maxHistoryItems < 1 ||
+										!settings.maxPatterns ||
+										settings.maxPatterns < 1 ||
+										!settings.maxMistakes ||
+										settings.maxMistakes < 1
+									) {
+										validatedSettings[modeKey] = DEFAULT_CONFIG.modeSettings[modeKey]
+									} else {
+										validatedSettings[modeKey] = settings
+									}
+								}
+							}
+
+							// Merge with existing settings, preserving modes not included in the update
+							const updatedSettings = { ...existingSettings, ...validatedSettings }
+							await this.updateGlobalState("contextMemoryModeSettings", updatedSettings)
+							await this.postStateToWebview()
+						}
 				}
 			},
 			null,
@@ -1717,7 +1755,31 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 
 	async postStateToWebview() {
 		const state = await this.getStateToPostToWebview()
-		this.postMessageToWebview({ type: "state", state })
+		const { contextMemoryEnabled, contextMemoryModeSettings } = await this.getState()
+		this.postMessageToWebview({
+			type: "state",
+			state: {
+				...state,
+				contextMemoryEnabled: contextMemoryEnabled ?? false,
+				contextMemoryModeSettings: contextMemoryModeSettings ?? {
+					code: {
+						maxHistoryItems: 50,
+						maxPatterns: 20,
+						maxMistakes: 10,
+					},
+					architect: {
+						maxHistoryItems: 30,
+						maxPatterns: 15,
+						maxMistakes: 5,
+					},
+					ask: {
+						maxHistoryItems: 20,
+						maxPatterns: 10,
+						maxMistakes: 3,
+					},
+				},
+			},
+		})
 	}
 
 	async getStateToPostToWebview() {
@@ -1750,6 +1812,8 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			enhancementApiConfigId,
 			experimentalDiffStrategy,
 			autoApprovalEnabled,
+			contextMemoryEnabled,
+			contextMemoryModeSettings,
 		} = await this.getState()
 
 		const allowedCommands = vscode.workspace.getConfiguration("roo-cline").get<string[]>("allowedCommands") || []
@@ -1790,6 +1854,8 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			experimentalDiffStrategy: experimentalDiffStrategy ?? false,
 			autoApprovalEnabled: autoApprovalEnabled ?? false,
 			customModes: await this.customModesManager.getCustomModes(),
+			contextMemoryEnabled: contextMemoryEnabled ?? DEFAULT_CONFIG.enabled,
+			contextMemoryModeSettings: contextMemoryModeSettings ?? DEFAULT_CONFIG.modeSettings,
 		}
 	}
 
@@ -1909,6 +1975,8 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			experimentalDiffStrategy,
 			autoApprovalEnabled,
 			customModes,
+			contextMemoryEnabled,
+			contextMemoryModeSettings,
 		] = await Promise.all([
 			this.getGlobalState("apiProvider") as Promise<ApiProvider | undefined>,
 			this.getGlobalState("apiModelId") as Promise<string | undefined>,
@@ -1973,6 +2041,8 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			this.getGlobalState("experimentalDiffStrategy") as Promise<boolean | undefined>,
 			this.getGlobalState("autoApprovalEnabled") as Promise<boolean | undefined>,
 			this.customModesManager.getCustomModes(),
+			this.getGlobalState("contextMemoryEnabled") as Promise<boolean | undefined>,
+			this.getGlobalState("contextMemoryModeSettings") as Promise<Record<Mode, ModeContextSettings> | undefined>,
 		])
 
 		let apiProvider: ApiProvider
@@ -2083,6 +2153,24 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			experimentalDiffStrategy: experimentalDiffStrategy ?? false,
 			autoApprovalEnabled: autoApprovalEnabled ?? false,
 			customModes,
+			contextMemoryEnabled: contextMemoryEnabled ?? false,
+			contextMemoryModeSettings: contextMemoryModeSettings ?? {
+				code: {
+					maxHistoryItems: 50,
+					maxPatterns: 20,
+					maxMistakes: 10,
+				},
+				architect: {
+					maxHistoryItems: 30,
+					maxPatterns: 15,
+					maxMistakes: 5,
+				},
+				ask: {
+					maxHistoryItems: 20,
+					maxPatterns: 10,
+					maxMistakes: 3,
+				},
+			},
 		}
 	}
 

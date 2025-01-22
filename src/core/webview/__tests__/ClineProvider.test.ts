@@ -320,6 +320,24 @@ describe("ClineProvider", () => {
 			requestDelaySeconds: 5,
 			mode: defaultModeSlug,
 			customModes: [],
+			contextMemoryEnabled: true,
+			contextMemoryModeSettings: {
+				code: {
+					maxHistoryItems: 50,
+					maxPatterns: 20,
+					maxMistakes: 10,
+				},
+				architect: {
+					maxHistoryItems: 30,
+					maxPatterns: 15,
+					maxMistakes: 5,
+				},
+				ask: {
+					maxHistoryItems: 20,
+					maxPatterns: 10,
+					maxMistakes: 3,
+				},
+			},
 		}
 
 		const message: ExtensionMessage = {
@@ -1181,6 +1199,176 @@ describe("ClineProvider", () => {
 					}),
 				}),
 			)
+		})
+
+		describe("context memory settings", () => {
+			test("handles contextMemoryEnabled message", async () => {
+				provider.resolveWebviewView(mockWebviewView)
+				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0]
+
+				await messageHandler({ type: "contextMemoryEnabled", bool: true })
+				expect(mockContext.globalState.update).toHaveBeenCalledWith("contextMemoryEnabled", true)
+				expect(mockPostMessage).toHaveBeenCalled()
+
+				await messageHandler({ type: "contextMemoryEnabled", bool: false })
+				expect(mockContext.globalState.update).toHaveBeenCalledWith("contextMemoryEnabled", false)
+				expect(mockPostMessage).toHaveBeenCalled()
+			})
+
+			test("validates mode settings values", async () => {
+				provider.resolveWebviewView(mockWebviewView)
+				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0]
+
+				// Test with invalid values (below minimum)
+				const invalidSettings = {
+					code: {
+						maxHistoryItems: 0, // Invalid: below minimum of 1
+						maxPatterns: 0, // Invalid: below minimum of 1
+						maxMistakes: 0, // Invalid: below minimum of 1
+					},
+				}
+
+				await messageHandler({ type: "contextMemorySettings", values: invalidSettings })
+
+				// Should fall back to default values
+				expect(mockContext.globalState.update).toHaveBeenCalledWith(
+					"contextMemoryModeSettings",
+					expect.objectContaining({
+						code: {
+							maxHistoryItems: 50,
+							maxPatterns: 20,
+							maxMistakes: 10,
+						},
+					}),
+				)
+
+				// Test with valid values
+				const validSettings = {
+					code: {
+						maxHistoryItems: 100,
+						maxPatterns: 30,
+						maxMistakes: 15,
+					},
+				}
+
+				await messageHandler({ type: "contextMemorySettings", values: validSettings })
+				expect(mockContext.globalState.update).toHaveBeenCalledWith("contextMemoryModeSettings", validSettings)
+			})
+
+			test("handles partial mode settings updates", async () => {
+				provider.resolveWebviewView(mockWebviewView)
+				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0]
+
+				// Mock existing settings
+				const existingSettings = {
+					code: {
+						maxHistoryItems: 50,
+						maxPatterns: 20,
+						maxMistakes: 10,
+					},
+					architect: {
+						maxHistoryItems: 30,
+						maxPatterns: 15,
+						maxMistakes: 5,
+					},
+				}
+
+				;(mockContext.globalState.get as jest.Mock).mockImplementation((key: string) => {
+					if (key === "contextMemoryModeSettings") {
+						return existingSettings
+					}
+					return null
+				})
+
+				// Update only one mode's settings
+				const partialUpdate = {
+					code: {
+						maxHistoryItems: 75,
+						maxPatterns: 25,
+						maxMistakes: 12,
+					},
+				}
+
+				await messageHandler({ type: "contextMemorySettings", values: partialUpdate })
+
+				// Should preserve other mode settings
+				expect(mockContext.globalState.update).toHaveBeenCalledWith(
+					"contextMemoryModeSettings",
+					expect.objectContaining({
+						code: partialUpdate.code,
+						architect: existingSettings.architect,
+					}),
+				)
+			})
+
+			test("handles contextMemorySettings message", async () => {
+				provider.resolveWebviewView(mockWebviewView)
+				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0]
+
+				const settings = {
+					code: {
+						maxHistoryItems: 50,
+						maxPatterns: 20,
+						maxMistakes: 10,
+					},
+					architect: {
+						maxHistoryItems: 30,
+						maxPatterns: 15,
+						maxMistakes: 5,
+					},
+					ask: {
+						maxHistoryItems: 20,
+						maxPatterns: 10,
+						maxMistakes: 3,
+					},
+				}
+
+				await messageHandler({ type: "contextMemorySettings", values: settings })
+				expect(mockContext.globalState.update).toHaveBeenCalledWith("contextMemoryModeSettings", settings)
+				expect(mockPostMessage).toHaveBeenCalled()
+			})
+
+			test("contextMemoryEnabled defaults to false", async () => {
+				// Mock globalState.get to return undefined for contextMemoryEnabled
+				;(mockContext.globalState.get as jest.Mock).mockImplementation((key: string) => {
+					if (key === "contextMemoryEnabled") {
+						return undefined
+					}
+					return null
+				})
+
+				const state = await provider.getState()
+				expect(state.contextMemoryEnabled).toBe(false)
+			})
+
+			test("contextMemoryModeSettings uses default values when not set", async () => {
+				// Mock globalState.get to return undefined for contextMemoryModeSettings
+				;(mockContext.globalState.get as jest.Mock).mockImplementation((key: string) => {
+					if (key === "contextMemoryModeSettings") {
+						return undefined
+					}
+					return null
+				})
+
+				const state = await provider.getState()
+				expect(state.contextMemoryModeSettings).toEqual({
+					code: {
+						maxHistoryItems: 50,
+						maxPatterns: 20,
+						maxMistakes: 10,
+					},
+					architect: {
+						maxHistoryItems: 30,
+						maxPatterns: 15,
+						maxMistakes: 5,
+					},
+					ask: {
+						maxHistoryItems: 20,
+						maxPatterns: 10,
+						maxMistakes: 3,
+					},
+				})
+			})
 		})
 	})
 })

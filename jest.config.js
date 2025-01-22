@@ -34,7 +34,7 @@ module.exports = {
 	transformIgnorePatterns: [
 		"node_modules/(?!(@modelcontextprotocol|delay|p-wait-for|globby|serialize-error|strip-ansi|default-shell|os-name)/)",
 	],
-	modulePathIgnorePatterns: [".vscode-test"],
+	modulePathIgnorePatterns: [".vscode-test", "out"],
 	reporters: [["jest-simple-dot-reporter", {}]],
 	setupFiles: [],
 }

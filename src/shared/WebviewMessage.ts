@@ -77,6 +77,8 @@ export interface WebviewMessage {
 		| "updateCustomMode"
 		| "deleteCustomMode"
 		| "setopenAiCustomModelInfo"
+		| "contextMemoryEnabled"
+		| "contextMemorySettings"
 	text?: string
 	disabled?: boolean
 	askResponse?: ClineAskResponse

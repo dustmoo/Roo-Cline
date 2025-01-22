@@ -8,6 +8,7 @@ import {
 	ContextValidationResult,
 	DEFAULT_CONFIG,
 	ContextStateKey,
+	ModeContextSettings,
 } from "./types"
 
 /**
@@ -23,6 +24,36 @@ export class ContextManager {
 			...config,
 		}
 		this.context = this.createEmptyContext()
+	}
+
+	/**
+	 * Updates the current mode and its associated settings
+	 */
+	public async setMode(mode: string): Promise<void> {
+		this.config.currentMode = mode
+		await this.updateSettings({ currentMode: mode })
+	}
+
+	/**
+	 * Gets the current mode's settings or falls back to defaults
+	 */
+	private getModeSettings(): ModeContextSettings {
+		const modeSettings = this.config.modeSettings[this.config.currentMode]
+		if (modeSettings) {
+			return modeSettings
+		}
+		return {
+			maxHistoryItems: this.config.maxHistoryItems,
+			maxPatterns: this.config.maxPatterns,
+			maxMistakes: this.config.maxMistakes,
+		}
+	}
+
+	/**
+	 * Checks if context memory is enabled
+	 */
+	private isEnabled(): boolean {
+		return this.config.enabled
 	}
 
 	/**
@@ -134,13 +165,16 @@ export class ContextManager {
 	 * Adds a command to recent history
 	 */
 	public async addCommandToHistory(command: string): Promise<void> {
+		if (!this.isEnabled()) return
+
 		this.context.user.history.recentCommands.unshift({
 			command,
 			timestamp: Date.now(),
 		})
 
-		// Maintain max history size
-		if (this.context.user.history.recentCommands.length > this.config.maxHistoryItems) {
+		// Maintain max history size based on mode settings
+		const { maxHistoryItems } = this.getModeSettings()
+		if (this.context.user.history.recentCommands.length > maxHistoryItems) {
 			this.context.user.history.recentCommands.pop()
 		}
 
@@ -151,6 +185,8 @@ export class ContextManager {
 	 * Records a pattern occurrence
 	 */
 	public async recordPattern(pattern: string): Promise<void> {
+		if (!this.isEnabled()) return
+
 		const existing = this.context.user.history.commonPatterns.find((p) => p.pattern === pattern)
 		if (existing) {
 			existing.occurrences++
@@ -161,9 +197,10 @@ export class ContextManager {
 			})
 		}
 
-		// Sort by occurrences and maintain max size
+		// Sort by occurrences and maintain max size based on mode settings
 		this.context.user.history.commonPatterns.sort((a, b) => b.occurrences - a.occurrences)
-		if (this.context.user.history.commonPatterns.length > this.config.maxPatterns) {
+		const { maxPatterns } = this.getModeSettings()
+		if (this.context.user.history.commonPatterns.length > maxPatterns) {
 			this.context.user.history.commonPatterns.pop()
 		}
 
@@ -174,14 +211,17 @@ export class ContextManager {
 	 * Records a mistake for learning
 	 */
 	public async recordMistake(type: string, description: string): Promise<void> {
+		if (!this.isEnabled()) return
+
 		this.context.user.history.mistakes.unshift({
 			type,
 			description,
 			timestamp: Date.now(),
 		})
 
-		// Maintain max size
-		if (this.context.user.history.mistakes.length > this.config.maxMistakes) {
+		// Maintain max size based on mode settings
+		const { maxMistakes } = this.getModeSettings()
+		if (this.context.user.history.mistakes.length > maxMistakes) {
 			this.context.user.history.mistakes.pop()
 		}
 
@@ -232,6 +272,36 @@ Recent Patterns: ${this.context.user.history.commonPatterns
 			.slice(0, 3)
 			.map((p) => p.pattern)
 			.join(", ")}
-Progress: ${this.context.task.progress.completed.length} steps completed, ${this.context.task.progress.pending.length} pending`
+Progress: ${this.context.task.progress.completed.length} steps completed, ${this.context.task.progress.pending.length} pending
+Context Memory: ${this.isEnabled() ? "Enabled" : "Disabled"} (Mode: ${this.config.currentMode})`
+	}
+
+	/**
+	 * Updates context memory settings
+	 */
+	public async updateSettings(settings: Partial<ContextConfig>): Promise<void> {
+		this.config = {
+			...this.config,
+			...settings,
+		}
+		await this.updateState("contextSettings", {
+			enabled: this.config.enabled,
+			modeSettings: this.config.modeSettings,
+		})
+	}
+
+	/**
+	 * Gets current context memory settings
+	 */
+	public getSettings(): {
+		enabled: boolean
+		currentMode: string
+		modeSettings: Record<string, ModeContextSettings>
+	} {
+		return {
+			enabled: this.config.enabled,
+			currentMode: this.config.currentMode,
+			modeSettings: this.config.modeSettings,
+		}
 	}
 }

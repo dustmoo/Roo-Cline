@@ -150,6 +150,71 @@ describe("ContextManager", () => {
 		})
 	})
 
+	describe("Context Memory Settings", () => {
+		it("should respect enabled/disabled state", async () => {
+			const config: ContextConfig = {
+				context: mockContext as vscode.ExtensionContext,
+				enabled: false,
+				currentMode: "code",
+				modeSettings: {
+					code: {
+						maxHistoryItems: 50,
+						maxPatterns: 20,
+						maxMistakes: 10,
+					},
+				},
+			}
+			contextManager = new ContextManager(config)
+
+			// When disabled, operations should be no-ops
+			await contextManager.addCommandToHistory("test-command")
+			await contextManager.recordPattern("test-pattern")
+			await contextManager.recordMistake("test", "description")
+
+			const context = contextManager.getContext()
+			expect(context.user.history.recentCommands).toHaveLength(0)
+			expect(context.user.history.commonPatterns).toHaveLength(0)
+			expect(context.user.history.mistakes).toHaveLength(0)
+		})
+
+		it("should use mode-specific settings", async () => {
+			const config: ContextConfig = {
+				context: mockContext as vscode.ExtensionContext,
+				enabled: true,
+				currentMode: "architect",
+				modeSettings: {
+					architect: {
+						maxHistoryItems: 5,
+						maxPatterns: 3,
+						maxMistakes: 2,
+					},
+				},
+			}
+			contextManager = new ContextManager(config)
+
+			// Add more items than the mode-specific limits
+			for (let i = 0; i < 10; i++) {
+				await contextManager.addCommandToHistory(`command-${i}`)
+				await contextManager.recordPattern(`pattern-${i}`)
+				await contextManager.recordMistake("test", `mistake-${i}`)
+			}
+
+			const context = contextManager.getContext()
+			expect(context.user.history.recentCommands).toHaveLength(5)
+			expect(context.user.history.commonPatterns).toHaveLength(3)
+			expect(context.user.history.mistakes).toHaveLength(2)
+		})
+
+		it("should update mode settings", async () => {
+			await contextManager.setMode("ask")
+			const context = contextManager.getContext()
+			const summary = contextManager.getContextSummary()
+
+			expect(summary).toContain("Mode: ask")
+			expect(mockGlobalState.update).toHaveBeenCalledWith("contextSettings", expect.any(Object))
+		})
+	})
+
 	describe("Context Summary", () => {
 		it("should generate meaningful context summary", async () => {
 			await contextManager.initializeTaskContext("summary-test", "test summary")

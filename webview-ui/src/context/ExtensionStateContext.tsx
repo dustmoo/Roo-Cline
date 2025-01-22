@@ -25,6 +25,27 @@ export interface ExtensionStateContextType extends ExtensionState {
 	openAiModels: string[]
 	mcpServers: McpServer[]
 	filePaths: string[]
+	// Context memory settings are managed in PromptsView since they are mode-specific
+	contextMemoryEnabled: boolean
+	contextMemoryModeSettings: Record<
+		Mode,
+		{
+			maxHistoryItems: number
+			maxPatterns: number
+			maxMistakes: number
+		}
+	>
+	setContextMemoryEnabled: (value: boolean) => void
+	setContextMemoryModeSettings: (
+		value: Record<
+			Mode,
+			{
+				maxHistoryItems: number
+				maxPatterns: number
+				maxMistakes: number
+			}
+		>,
+	) => void
 	setApiConfiguration: (config: ApiConfiguration) => void
 	setCustomInstructions: (value?: string) => void
 	setAlwaysAllowReadOnly: (value: boolean) => void
@@ -98,6 +119,24 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		experimentalDiffStrategy: false,
 		autoApprovalEnabled: false,
 		customModes: [],
+		contextMemoryEnabled: true,
+		contextMemoryModeSettings: {
+			code: {
+				maxHistoryItems: 50,
+				maxPatterns: 20,
+				maxMistakes: 10,
+			},
+			architect: {
+				maxHistoryItems: 30,
+				maxPatterns: 15,
+				maxMistakes: 5,
+			},
+			ask: {
+				maxHistoryItems: 20,
+				maxPatterns: 10,
+				maxMistakes: 3,
+			},
+		},
 	})
 
 	const [didHydrateState, setDidHydrateState] = useState(false)
@@ -266,10 +305,21 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		setMcpEnabled: (value) => setState((prevState) => ({ ...prevState, mcpEnabled: value })),
 		setAlwaysApproveResubmit: (value) => setState((prevState) => ({ ...prevState, alwaysApproveResubmit: value })),
 		setRequestDelaySeconds: (value) => setState((prevState) => ({ ...prevState, requestDelaySeconds: value })),
+		setContextMemoryEnabled: (value) => {
+			setState((prevState) => ({ ...prevState, contextMemoryEnabled: value }))
+			vscode.postMessage({ type: "contextMemoryEnabled", bool: value })
+		},
+		setContextMemoryModeSettings: (value) => {
+			setState((prevState) => ({ ...prevState, contextMemoryModeSettings: value }))
+			vscode.postMessage({ type: "contextMemorySettings", values: value })
+		},
 		setCurrentApiConfigName: (value) => setState((prevState) => ({ ...prevState, currentApiConfigName: value })),
 		setListApiConfigMeta,
 		onUpdateApiConfig,
-		setMode: (value: Mode) => setState((prevState) => ({ ...prevState, mode: value })),
+		setMode: (value: Mode) => {
+			setState((prevState) => ({ ...prevState, mode: value }))
+			vscode.postMessage({ type: "mode", mode: value })
+		},
 		setCustomPrompts: (value) => setState((prevState) => ({ ...prevState, customPrompts: value })),
 		setEnhancementApiConfigId: (value) =>
 			setState((prevState) => ({ ...prevState, enhancementApiConfigId: value })),
