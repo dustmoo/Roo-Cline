@@ -117,6 +117,7 @@ export interface ExtensionState {
 			maxMistakes: number
 		}
 	>
+	toolRequirements?: Record<string, boolean> // Map of tool names to their requirements (e.g. {"apply_diff": true} if diffEnabled)
 }
 
 export interface ClineMessage {

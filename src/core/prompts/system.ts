@@ -37,13 +37,18 @@ async function generatePrompt(
 	promptComponent?: PromptComponent,
 	customModeConfigs?: ModeConfig[],
 	globalCustomInstructions?: string,
+	preferredLanguage?: string,
+	diffEnabled?: boolean,
 ): Promise<string> {
 	if (!context) {
 		throw new Error("Extension context is required for generating system prompt")
 	}
 
+	// If diff is disabled, don't pass the diffStrategy
+	const effectiveDiffStrategy = diffEnabled ? diffStrategy : undefined
+
 	const [mcpServersSection, modesSection] = await Promise.all([
-		getMcpServersSection(mcpHub, diffStrategy),
+		getMcpServersSection(mcpHub, effectiveDiffStrategy),
 		getModesSection(context),
 	])
 
@@ -59,7 +64,7 @@ ${getToolDescriptionsForMode(
 	mode,
 	cwd,
 	supportsComputerUse,
-	diffStrategy,
+	effectiveDiffStrategy,
 	browserViewportSize,
 	mcpHub,
 	customModeConfigs,
@@ -69,7 +74,7 @@ ${getToolUseGuidelinesSection()}
 
 ${mcpServersSection}
 
-${getCapabilitiesSection(cwd, supportsComputerUse, mcpHub, diffStrategy)}
+${getCapabilitiesSection(cwd, supportsComputerUse, mcpHub, effectiveDiffStrategy)}
 
 ${modesSection}
 
@@ -79,7 +84,7 @@ ${getSystemInfoSection(cwd, mode, customModeConfigs)}
 
 ${getObjectiveSection()}
 
-${await addCustomInstructions(modeConfig.customInstructions || "", globalCustomInstructions || "", cwd, mode, {})}`
+${await addCustomInstructions(promptComponent?.customInstructions || modeConfig.customInstructions || "", globalCustomInstructions || "", cwd, mode, { preferredLanguage })}`
 
 	return basePrompt
 }
@@ -95,6 +100,8 @@ export const SYSTEM_PROMPT = async (
 	customPrompts?: CustomPrompts,
 	customModes?: ModeConfig[],
 	globalCustomInstructions?: string,
+	preferredLanguage?: string,
+	diffEnabled?: boolean,
 ): Promise<string> => {
 	if (!context) {
 		throw new Error("Extension context is required for generating system prompt")
@@ -112,16 +119,21 @@ export const SYSTEM_PROMPT = async (
 	// Get full mode config from custom modes or fall back to built-in modes
 	const currentMode = getModeBySlug(mode, customModes) || modes.find((m) => m.slug === mode) || modes[0]
 
+	// If diff is disabled, don't pass the diffStrategy
+	const effectiveDiffStrategy = diffEnabled ? diffStrategy : undefined
+
 	return generatePrompt(
 		context,
 		cwd,
 		supportsComputerUse,
 		currentMode.slug,
 		mcpHub,
-		diffStrategy,
+		effectiveDiffStrategy,
 		browserViewportSize,
 		promptComponent,
 		customModes,
 		globalCustomInstructions,
+		preferredLanguage,
+		diffEnabled,
 	)
 }

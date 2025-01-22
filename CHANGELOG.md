@@ -1,5 +1,13 @@
 # Roo Code Changelog
 
+## [3.2.4]
+
+- Only allow use of the diff tool if it's enabled in settings
+
+## [3.2.3]
+
+- Fix bug where language selector wasn't working
+
 ## [3.2.0 - 3.2.2]
 
 - **Name Change From Roo Cline to Roo Code:** We're excited to announce our new name! After growing beyond 50,000 installations, we've rebranded from Roo Cline to Roo Code to better reflect our identity as we chart our own course.
